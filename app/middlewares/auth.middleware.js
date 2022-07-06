@@ -15,9 +15,12 @@ exports.authenticateToken = (req, res, next) => {
     	wallet: user.wallet_address,
       avatar_url: user.avatar_url,
       sol_balance: user.sol_balance,
-      loot_total: user.loot_total,
+      total_loot: user.total_loot,
+      total_loot_won: user.total_loot_won,
+      loose_loost: user.loose_loost,
       uid: user.uid,
       fullname: user.fullname,
+      avatar_url: user.avatar_url
     }
     next() // pass the execution off to whatever request the client intended
   })

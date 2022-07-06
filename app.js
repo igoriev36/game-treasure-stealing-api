@@ -3,9 +3,12 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
-var bodyParser = require('body-parser')
+var bodyParser = require('body-parser');
 
 var app = express();
+var cron = require('node-cron');
+
+var GameHelper = require('./app/GameHelper');
 
 app.use(function (req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
@@ -29,12 +32,29 @@ app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({ extended: false }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
+app.use('/admin', express.static(path.join(__dirname, 'admin')));
 app.use(express.static(path.join(__dirname, 'public')));
 
+const AdminApiRouter = require('./routes/admin-api');
 const ApiRouter = require('./routes/api');
 const WebRouter = require('./routes/web');
-WebRouter.config(app)
-ApiRouter.config(app)
+AdminApiRouter.config(app);
+WebRouter.config(app);
+ApiRouter.config(app);
+
+// For Cronjob
+cron.schedule('* * * * *', () => {
+  //app.io.of('gts.dashboard').emit('game_update', { msg: 'running a task every minute' });
+});
+
+cron.schedule('0 17 * * *', async () => {
+  app.io.of('gts.dashboard').emit('game_update', { msg: 'Running a job at 17:00 at UTC timezone' });
+  const game_helper = new GameHelper();
+  await game_helper.PrizesDistribution();
+}, {
+  scheduled: true,
+  timezone: "UTC"
+});
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

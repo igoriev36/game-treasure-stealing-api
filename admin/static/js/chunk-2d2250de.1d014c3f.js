@@ -1,0 +1,1 @@
+(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d2250de"],{e382:function(n,t,e){"use strict";e.r(t);var a=function(){var n=this,t=n.$createElement,e=n._self._c||t;return e("div",{staticClass:"app-container"},[n._v(" User List ")])},s=[],c={data:function(){return{}}},r=c,u=e("2877"),i=Object(u["a"])(r,a,s,!1,null,null,null);t["default"]=i.exports}}]);
