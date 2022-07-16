@@ -9,13 +9,15 @@ var app = express();
 var cron = require('node-cron');
 
 var GameHelper = require('./app/GameHelper');
+var { Solana } = require('./app/solana');
 
 app.use(function (req, res, next) {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = process.env.ORIGIN_ALLOW || '';
+  res.header('Access-Control-Allow-Origin', origin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
   res.header('Access-Control-Expose-Headers', 'Content-Length');
-  res.header('Access-Control-Allow-Headers', 'Accept, Authorization, Content-Type, X-Requested-With, Range');
+  res.header('Access-Control-Allow-Headers', 'Accept, Authorization, Content-Type, X-Requested-With, Range, x-api-key, x-app-id, x-build-id, x-viewer-address');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   } else {
@@ -43,8 +45,15 @@ WebRouter.config(app);
 ApiRouter.config(app);
 
 // For Cronjob
-cron.schedule('* * * * *', () => {
+cron.schedule('* * * * *', async () => {
   //app.io.of('gts.dashboard').emit('game_update', { msg: 'running a task every minute' });
+  const Sol = new Solana();
+  await Sol.updateSolRate();
+});
+
+cron.schedule('0 7,19 * * *', async () => {
+  //const Sol = new Solana();
+  //await Sol.updateSolRate();
 });
 
 cron.schedule('0 17 * * *', async () => {

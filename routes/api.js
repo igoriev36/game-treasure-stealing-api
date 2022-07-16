@@ -10,6 +10,7 @@ exports.config = function(app, _prefix){
 
   //Auth
 	app.post(`${_prefix}/auth/login`, [AuthController.login]);
+	app.post(`${_prefix}/auth/connect-wallet`, [AuthController.connectWallet]);
 	app.post(`${_prefix}/auth/refresh-token`, [AuthController.refresh_token]);
 	app.get(`${_prefix}/auth/info`, [authenticateToken, AuthController.info]);
 	app.post(`${_prefix}/auth/logout`, [authenticateToken, AuthController.logout]);

@@ -7,6 +7,7 @@ const User = require('../models/User');
 const Game = require('../models/Game');
 var moment = require('moment');
 const GameHelper = require('../GameHelper');
+const stripslashes = require('locutus/php/strings/stripslashes');
 
 /**
  * [description]
@@ -19,9 +20,22 @@ exports.updateHeroStatus = async (req, res) => {
 	let update = false;
 	const hero_mint = req.body.hero_mint;
 	const user_id = parseInt(req.user.id);
+	const user = await User.findByPk(user_id);
+	const hero = await Hero.findOne({ where: {mint: hero_mint, user_id: user_id} });
+	let currentGame = await user.getCurrentGame();
 
-	const hero = await Hero.findOne({ where: {mint: hero_mint, user_id: user_id} })
-	if(hero){
+	if(currentGame === null){
+		currentGame = await GamePlaying.create({user_id: user_id, data: {}, heroes: '[]', finished: 0, non_nft_entries: 0}).then( data => {
+			return data;
+		}).catch( error => {
+			console.log(error);
+		});
+	}
+
+	let heroes_arr = currentGame !== null && typeof currentGame.heroes === 'string'? currentGame.heroes: '[]';
+	heroes_arr = JSON.parse(heroes_arr);
+
+	if(hero && currentGame !== null){
 		let status = hero.active;
 		if(status === null || status === ''){
 			status = 1;
@@ -31,15 +45,24 @@ exports.updateHeroStatus = async (req, res) => {
 
 		hero.active = !status? 0: 1;
 		update = await hero.save();
+
+		// Check and add to list
+		if(heroes_arr.indexOf(hero.mint) === -1 && status){
+			heroes_arr.push(hero.mint);
+		}else{
+			heroes_arr = heroes_arr.filter(function(token){ return token != hero.mint; });
+		}
+
+		currentGame.heroes = stripslashes(JSON.stringify(heroes_arr));
+		await currentGame.save();
 	}
 
 	// Update current game
 	const helper = new GameHelper();
 	helper.PrepareCalculation();
 
-	const user = await User.findByPk(user_id);
 	const game_info = await user.getCalGameInfo();
-	UserMeta._update(user_id, 'current_entries_calc', JSON.stringify(game_info));
+	//UserMeta._update(user_id, 'current_entries_calc', JSON.stringify(game_info));
 
 	res.json({ 
 		success: true,
@@ -57,15 +80,22 @@ exports.updateHeroStatus = async (req, res) => {
 exports.updateNonNftEntries = async (req, res) => {
 	const user_id = parseInt(req.user.id);
 	const entries = req.body.entries || 0;
-	await UserMeta._update(user_id, 'non_nft_entries', entries);
+
+	const user = await User.findByPk(user_id);
+	let currentGame = await user.getCurrentGame();
+
+	if(currentGame === null){
+		currentGame = await GamePlaying.create({user_id: user_id, data: {}, heroes: '[]', finished: 0, non_nft_entries: 0});
+	}
+
+	await currentGame.updateNonNftEntries(entries);
+	const game_info = await user.getCalGameInfo();
+	//await UserMeta._update(user_id, 'non_nft_entries', entries);
 
 	// Update current game
 	const helper = new GameHelper();
 	helper.PrepareCalculation();
 
-	const user = await User.findByPk(user_id);
-	const game_info = await user.getCalGameInfo();
-	
 	res.json({ 
 		success: true,
 		game_info: game_info
@@ -89,26 +119,31 @@ exports.enterGame = async (req, res) => {
 		game_id = parseInt(game.id);
 	}
 
-	let game_playing_id = await user.getCurrentGameId();
-	const game_info = await user.getCalGameInfo();
-	let json_data = game_info;
-
-	if(!game_playing_id){
-		let game_playing = await GamePlaying.create({
+	let currentGame = await user.getCurrentGame();
+	let game_playing_id = 0;
+	if(currentGame === null){
+		currentGame = await GamePlaying.create({
 			user_id: user_id,
 			game_id: game_id,
 			data: json_data,
 			won: 0,
 			bonus: 0,
 			note: '',
-			heroes: [],
+			heroes: '[]',
 			finished: 0,
-			winning_hero: ''
+			winning_hero: '',
+			non_nft_entries: 0
 		});
-		game_playing_id = parseInt(game_playing.id);
+		
 	}else{
-		//console.log(game);
+		currentGame.game_id = game_id;
+		currentGame.save();
 	}
+
+	game_playing_id = parseInt(currentGame.id);
+
+	const game_info = await user.getCalGameInfo();
+	let json_data = game_info;
 
 	const helper = new GameHelper();
 	helper.PrepareCalculation();
@@ -116,6 +151,7 @@ exports.enterGame = async (req, res) => {
 	res.json({ 
 		success: true,
 		game_info: game_info,
+		game_id: game_id,
 		game_playing_id: game_playing_id
 	});
 }

@@ -12,6 +12,7 @@ const GameSimulatorTest = require('../GameSimulatorTest');
 const fn = require('../Functions');
 var moment = require('moment');
 const _ = require('lodash');
+const { SolanaWallet, Solana } = require('../solana');
 
 exports.dev = async (req, res) => {
 	//const user = await User.findByPk(1);
@@ -21,9 +22,9 @@ exports.dev = async (req, res) => {
 	//const dr = fn.lastDateRange();
 	//console.log(dr);
 	
-	const helper = new GameHelper();
-	let data = await helper.PrizesDistribution();
-	console.log(data);
+	// const helper = new GameHelper();
+	// let data = await helper.PrizeCalc();
+	// console.log(data);
 	// req.app.io.of('gts.dashboard').emit('game_update', {
 	// 	data: data
 	// });
@@ -35,6 +36,12 @@ exports.dev = async (req, res) => {
 	
 	// const simulator = new GameSimulatorTest();
 	// await simulator.createGameForAllUser();
+	// 
+	// const SW = new SolanaWallet();
+	// const info = await SW.getWalletInfo('wage auto fluid sketch solar news pear profit soon ladder drama various');
+	// console.log(info);
+	const Sol = new Solana();
+	const test = await Sol.getSolBalance('3UqiAthJCdNVAc1neWWfqmkBwE6Byjadnfq9hgB4X1FR'); console.log(test);
 	
 	res.render('dev', { title: '4Dev' });
 }
@@ -58,13 +65,15 @@ exports.getGameInfo = async (req, res) => {
     	current_game = await Game.create({data: {}, end: 0, thieves_count: 0});
     }
 
+    const {main_pot, bonus} = await Game.getPot();
+
 	const game_info = {
 		time_now: now,
 		wake_time: wake_time,
 		seconds: seconds,
 		bonenosher_bounty: {
-			total: data.NoRakePrizePool || 0,
-			loose: 0
+			total: main_pot,
+			loose: bonus
 		},
 		queued_thieves: current_game.thieves_count || 0,
 		active_thieves: 0,
@@ -74,8 +83,13 @@ exports.getGameInfo = async (req, res) => {
 		}
 	};
 
+	const sol_usd_rate = await fn.getRateSol();
+	const primary_wallet = await fn.getPrimaryWallet();
+
 	res.json({ 
 		success: true,
+		sol_usd_rate: sol_usd_rate,
+		primary_wallet: primary_wallet,
 		game_info: game_info
 	});
 }

@@ -14,8 +14,9 @@ var GamePlaying = sequelize.define('GamePlaying', {
 	won				: Sequelize.INTEGER,
 	bonus			: Sequelize.INTEGER,
 	note			: Sequelize.TEXT,
-	heroes			: Sequelize.JSONB,
+	heroes			: Sequelize.TEXT,
 	finished		: Sequelize.INTEGER,
+	non_nft_entries	: Sequelize.INTEGER,
 	winning_hero	: Sequelize.STRING
 },{
 	tableName    	: 'game_playing',
@@ -24,5 +25,11 @@ var GamePlaying = sequelize.define('GamePlaying', {
 	timestamps   	: true,
 	underscored  	: true
 });
+
+GamePlaying.prototype.updateNonNftEntries = async function(amount){
+	amount = parseInt(amount) || 0;
+	this.update({non_nft_entries: amount});
+	return await this.save();
+}
 
 module.exports = GamePlaying;

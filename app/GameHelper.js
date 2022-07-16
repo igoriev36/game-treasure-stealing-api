@@ -165,7 +165,8 @@ class GameHelper {
                 let token_tmp = token;
                 const token_info = await token.getExtraInfo();
                 let entry_legacy = token_info.legacy;
-                entry_total += parseInt(entry_legacy);
+                //entry_total += parseInt(entry_legacy);
+                entry_total++;
                 token_tmp.token_info = token_info;
                 tokens_data.push(token_tmp);
             }));
@@ -176,9 +177,9 @@ class GameHelper {
                 var var_of_hero_tier = _.chain(hero_tier_data).filter(function (h) { return h.tier === token.hero_tier }).first().value();
                 const token_info = token.token_info;
                 const legacy = token_info.legacy;
-                let spent_per_hero = AVG_price_per_entry*legacy;
-                let extra_tix = legacy*var_of_hero_tier.tix_from_stats;
-                let ticket_per_hero = legacy*var_of_hero_tier.tickets + extra_tix;
+                let spent_per_hero = AVG_price_per_entry;
+                let extra_tix = var_of_hero_tier.tix_from_stats;
+                let ticket_per_hero = var_of_hero_tier.tickets + extra_tix;
                 TotalSpent += spent_per_hero;
                 ticket_total += ticket_per_hero;
             });
@@ -215,7 +216,7 @@ class GameHelper {
      * [PrizeCalc description]
      */
     async PrizeCalc(){
-        const entry_calc = await this.PrepareCalculation(); console.log(entry_calc);
+        const entry_calc = await this.PrepareCalculation(); //console.log(entry_calc);
         let users_count = entry_calc.user_total;
         let percent_of_user_paid = parseInt(await Option._get('percent_of_user_paid'));
         const winning_users = Math.round((users_count*percent_of_user_paid/100)+1);
@@ -304,6 +305,8 @@ class GameHelper {
                 }
             }
         }
+
+        await Game.setEndGame();
 
         return true;
     }

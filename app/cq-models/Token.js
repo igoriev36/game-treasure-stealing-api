@@ -1,5 +1,6 @@
 //Store
 var {Sequelize, cq_sequelize} = require('../../config/sequelize.js');
+const TokenName = require('./TokenName');
 const Character = require('./Character');
 const MetaData = require('./MetaData');
 const DawnOfMan = require('./DawnOfMan');
@@ -30,12 +31,18 @@ var Token = cq_sequelize.define('Token', {
 	underscored  	: true
 });
 
+Token.hasOne(TokenName, {
+  	foreignKey: 'nft_id',
+  	targetKey: 'token_address'
+});
+
 Token.hasOne(Character, {
   	foreignKey: 'nft_id',
   	targetKey: 'token_address'
 });
 
-Token.hasOne(MetaData, {
+Token.hasMany(MetaData, {
+	as: 'meta',
   	foreignKey: 'nft_id',
   	targetKey: 'token_address'
 });

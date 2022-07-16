@@ -56,7 +56,13 @@ class GameSimulatorTest{
 		console.log('Start')
 		const users = await User.findAll();
 		if(users){
-			const game_id = await Game.getCurrentId();
+			let game_id = await Game.getCurrentId();
+
+			if(!game_id){
+				const game = await Game.create({data: {}, end: 0});
+				game_id = game !== null? parseInt(game.id): 0;
+			}
+
 			users.forEach( async user => {
 				const user_id = parseInt(user.id);
 				const game_info = await user.getCalGameInfo();

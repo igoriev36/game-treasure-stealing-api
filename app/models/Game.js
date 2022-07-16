@@ -53,6 +53,25 @@ Game.getQueuedThieves = async function(){
 	return count;
 }
 
+Game.getPot = async function(){
+	const game_id = await Game.getCurrentId();
+	const playing_list = await GamePlaying.findAll({where: {game_id: game_id}});
+	let total = 0;
+	let main_pot = 0;
+	let bonus = 0;
+	if(playing_list){
+		playing_list.forEach( playing => {
+			const data = playing.data;
+			total += parseFloat(data.TotalSpent);
+		})
+	}
+
+	main_pot = total*66/100;
+	bonus = total*33/100;
+
+	return {main_pot: main_pot, bonus: bonus};
+}
+
 Game.getData = async function(){
 	const game = await Game.getTodayGame();
 	return game !== null? game.data: {};

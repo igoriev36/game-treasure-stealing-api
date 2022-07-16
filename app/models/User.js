@@ -34,17 +34,26 @@ var User = sequelize.define('User', {
 	underscored  	: true
 });
 
-User.prototype.getCurrentGameId = async function(){
+User.prototype.getCurrentGame = async function(){
 	const {start_date, end_date} = fn.dateRange();
-	const game = await GamePlaying.findOne({where: {
+	let game = await GamePlaying.findOne({where: {
 		user_id: parseInt(this.id),
       	created_at: { 
         	[Op.gt]: start_date,
         	[Op.lt]: end_date
       	},
       	finished: 0
-    }});
+    }, order: [['id', 'DESC']]});
 
+    // if(game === null){
+    // 	game = await GamePlaying.create({user_id: parseInt(this.id), data: {}, heroes: '[]', finished: 0, non_nft_entries: 0});
+    // }
+
+    return game;
+}
+
+User.prototype.getCurrentGameId = async function(){
+	const game = await this.getCurrentGame();
     return game !== null? parseInt(game.id): 0;
 }
 
@@ -61,7 +70,7 @@ User.prototype.getCalGameInfo = async function() {
 
 	// get Non-NFT
 	let non_nft_entries = 0;
-	let user_nne = await UserMeta._get(user_id, 'non_nft_entries', true);
+	let user_nne = await this.getNonNftEntries();
 	if(user_nne){
 		non_nft_entries = parseInt(user_nne);
 	}
@@ -77,39 +86,43 @@ User.prototype.getCalGameInfo = async function() {
 		return look !== null? look.value: 0;
 	}
 
-	if(tokens && tokens.length > 0){
-		let tokens_data = [];
-		await Promise.all(tokens.map(async (token) => {
-			let token_tmp = token;
-			const token_info = await token.getExtraInfo();
-			let entry_legacy = token_info.legacy;
-			entry_total += parseInt(entry_legacy);
-			token_tmp.token_info = token_info;
-			tokens_data.push(token_tmp);
-		}));
-
-		entry_total += non_nft_entries; // addition Non-NFT amount
-		price_per_entry = await getPricePerEntry(entry_total);
-
-		// Get hero tier ticket data
-		const hero_tier_data = await HeroTierTicket.findAll();
-		tokens_data.forEach( token => {
-			var var_of_hero_tier = _.chain(hero_tier_data).filter(function (h) { return h.tier === token.hero_tier }).first().value();
-			const token_info = token.token_info;
-			const legacy = token_info.legacy;
-			let spent_per_hero = price_per_entry*legacy;
-			let ticket_per_hero = legacy*var_of_hero_tier.tickets;
-			TotalSpent += spent_per_hero;
-			ticket_total += ticket_per_hero;
-		});
-	}
-
 	if(non_nft_entries > 0){
 		price_per_entry = await getPricePerEntry(non_nft_entries);
 		const hero_tier_nne = await HeroTierTicket.findOne({where: {tier: 'Non-NFT'}});
 		ticket_total += non_nft_entries * parseInt(hero_tier_nne.tickets);
 		entry_total += non_nft_entries;
 		TotalSpent += price_per_entry*non_nft_entries;
+	}
+
+	if(tokens && tokens.length > 0){
+		let tokens_data = [];
+		await Promise.all(tokens.map(async (token) => {
+			let token_tmp = token;
+			const token_info = await token.getExtraInfo();
+			let entry_legacy = token_info.legacy;
+			//entry_total += parseInt(entry_legacy);
+			entry_total++;
+			token_tmp.token_info = token_info;
+			tokens_data.push(token_tmp);
+		}));
+
+		//entry_total += non_nft_entries; // addition Non-NFT amount
+		price_per_entry = await getPricePerEntry(entry_total);
+
+		// Get hero tier ticket data
+		// Total Tickets per Entry = Base Tickets + Extra Tickets from Hero Stats
+		const hero_tier_data = await HeroTierTicket.findAll();
+		tokens_data.forEach( async token => {
+			var var_of_hero_tier = _.chain(hero_tier_data).filter(function (h) { return h.tier === token.hero_tier }).first().value();
+			const token_info = token.token_info;
+			const legacy = token_info.legacy;
+			let spent_per_hero = price_per_entry;
+			let ticket_per_hero = var_of_hero_tier.tickets; // Base Tickets
+			const extraTickets = var_of_hero_tier.tix_from_stats;
+			TotalSpent += spent_per_hero;
+			ticket_total += ticket_per_hero;
+			ticket_total += extraTickets;
+		});
 	}
 
 	//let game_calc = await Option._get('last_update_entry_calc');
@@ -140,21 +153,25 @@ User.prototype.getCalGameInfo = async function() {
 	entry_cal.NoRakeEV = NoRakeEV;
 	entry_cal.PostRakeEV = PostRakeEV;
 	//console.log(entry_cal);
-	UserMeta._update(user_id, 'current_entries_calc', JSON.stringify(entry_cal));
-
+	//UserMeta._update(user_id, 'current_entries_calc', JSON.stringify(entry_cal));
+	const currentGame = await this.getCurrentGame();
+	if(currentGame !== null){
+		currentGame.update({data: entry_cal});
+		currentGame.save();
+	}
+	
 	return entry_cal;
 }
 
 User.prototype.getNonNftEntries = async function() {
-	const non_nft_entries = await UserMeta._get(parseInt(this.id), 'non_nft_entries', true);
-	return parseInt(non_nft_entries);
+	const game = await this.getCurrentGame();
+    return game !== null? parseInt(game.non_nft_entries): 0;
 }
 
 User.prototype.getCurrentEntriesCalc = async function() {
-	let current_entries_calc = await UserMeta._get(parseInt(this.id), 'current_entries_calc', true);
-	if(current_entries_calc){
-		current_entries_calc = JSON.parse(current_entries_calc);
-	}else{
+	const currentGame = await this.getCurrentGame();
+	let current_entries_calc = currentGame !== null? currentGame.data: {};
+	if(_.isEmpty(current_entries_calc)){
 		current_entries_calc = JSON.parse('{"TotalSpent":0,"entry_total":0,"ticket_total":0,"ChanceOfWinning":0,"ChanceNotWin":0,"NoRakeEV":0,"PostRakeEV":0}');
 	}
 	return current_entries_calc;

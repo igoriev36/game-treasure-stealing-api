@@ -8,6 +8,8 @@ var gravatar = require('gravatar');
 const Tools = require('../Tools');
 const { v4: uuidv4 } = require('uuid');
 var moment = require('moment'); // require
+var randomstring = require("randomstring");
+var uniqid = require('locutus/php/misc/uniqid');
 
 /**
  * Connect wallet method
@@ -15,9 +17,72 @@ var moment = require('moment'); // require
  * @param  {Object} res [description]
  * @return {[type]}     [description]
  */
-exports.connect_wallet = async (req, res) => {
-	res.json({ 
-		success: true
+exports.connectWallet = async (req, res) => {
+	let success = true;
+	let message = '';
+	const wallet = req.body.wallet;
+	const signature = req.body.signature;
+	let token = null;
+	let refresh_token = null;
+
+	let user = await User.findOne({where: {wallet_address: wallet}}).then( res => {
+		return res !== null? res.dataValues: null
+	}).catch( () => {
+		return null
+	})
+		
+	if(!user){
+		const password = randomstring.generate();
+		const hash = await bcrypt.hash(password, 10);
+
+		const user = await User.create({
+			fullname: '',
+			wallet_address: wallet,
+			password: hash,
+			email: null,
+			email_verified_at: null,
+			balance: 0,
+			active: 1,
+			sol_balance: 0,
+			total_loot: 0,
+			total_loot_won: 0,
+			loose_loost: 0,
+		  	avatar_url: '',
+			uid: uniqid(6)
+		});
+
+		user.fullname = `b${user.id}`;
+		user.save();
+	}
+
+	if(user){
+		delete user.password
+
+		let token_id = uuidv4();
+		user.token_id = token_id;
+
+		token = jwt.sign(user, process.env.TOKEN_SECRET, { expiresIn: process.env.TOKEN_EXPIRES_IN });
+		refresh_token = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET, { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN });
+
+		let payload = jwt.decode(refresh_token);
+		let expires_at = moment(payload.exp*1000).format("YYYY-MM-DD hh:mm:ss");
+
+		const token_data = await RefreshToken.create({ id: token_id, token: refresh_token, data: JSON.stringify(user), expires_at: expires_at }).then( data => {
+			return data !== null? data.dataValues: null
+		}).catch( error => {
+			console.log(error);
+		});
+
+		message = 'Login successfully'
+	}
+
+	res.json({
+		success: success,
+		message: message,
+		data: {
+			token: token,
+			refresh_token: refresh_token
+		}
 	});
 }
 
@@ -148,11 +213,19 @@ exports.info = async (req, res) => {
 	const {heroes_mint, heroes_data} = await user.getHeroes();
 	const non_nft_entries = await user.getNonNftEntries();
 	const current_entries_calc = await user.getCurrentEntriesCalc();
+	const currentGame = await user.getCurrentGame();
+	let game_playing_id = 0, game_id = 0;
+	if(currentGame !== null){
+		game_playing_id = currentGame.id;
+		game_id = currentGame.game_id;
+	}
 
 	res.json({
 		success: true,
-		message: 'Load user info success',
+		message: 'Data loaded',
 		data: {
+			game_playing_id: game_playing_id,
+			game_id: game_id,
 			user: req.user,
 			heroes: heroes_mint,
 			heroes_data: heroes_data,

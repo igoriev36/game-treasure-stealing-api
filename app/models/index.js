@@ -8,8 +8,12 @@ var RefreshToken 		= require('./RefreshToken.js');
 var Transaction 		= require('./Transaction.js');
 var User 				= require('./User.js');
 var UserMeta 			= require('./UserMeta.js');
+var Admin 				= require('./Admin.js');
+var AdminWallet 		= require('./AdminWallet.js');
 
 module.exports = { 
+	Admin,
+	AdminWallet,
 	Game,
 	GamePlaying,
 	Hero,
