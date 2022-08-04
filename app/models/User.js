@@ -6,6 +6,7 @@ const { Token } = require('../cq-models');
 const fn = require('../Functions');
 const _ = require('lodash');
 var moment = require('moment');
+const { Solana } = require('../solana');
 
 var User = sequelize.define('User', {
 	id: {
@@ -34,6 +35,32 @@ var User = sequelize.define('User', {
 	underscored  	: true
 });
 
+// Check and sync heroes (tokens)
+User.prototype.checkAndSyncHeroes = async function(){
+	const Sol = new Solana();
+	const tokens = await Sol.getTokensByOwner(this.wallet_address);
+	tokens.forEach( async token => {
+		const findToken = await Hero.findOne({where: {user_id: parseInt(this.id), mint: token}});
+		if(findToken === null){
+			await Hero.create({
+				mint: token,
+				user_id: parseInt(this.id),
+				active: 0,
+				extra_data: {}
+			});
+		}
+	})
+}
+
+// Get wallet address by id
+User.getWalletAddressById = async function(user_id){
+	const user = await User.findByPk(user_id);
+	if(!user)
+		return '';
+	return user.wallet_address;
+}
+
+// Get current game
 User.prototype.getCurrentGame = async function(){
 	const {start_date, end_date} = fn.dateRange();
 	let game = await GamePlaying.findOne({where: {

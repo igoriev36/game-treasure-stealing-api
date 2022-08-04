@@ -3,6 +3,7 @@
  * Author: os.solutionvn@gmail.com <Be Duc Tai>
  */
 
+const { TOKEN_PROGRAM_ID, AccountLayout } = require("@solana/spl-token");
 const parseArgs = require('minimist');
 const web3 = require('@solana/web3.js');
 const SOLANA_DECIMAL = 9;
@@ -29,9 +30,13 @@ class Solana {
 		return Object.assign({}, default_settings, settings);
 	}
 
-	async getConnection() {
+	async getNodeType(){
 		const settings = await this.getSettings();
-		let node_type = settings.node_type || nodeType;
+		return settings.node_type || nodeType;
+	}
+
+	async getConnection() {
+		let node_type = await this.getNodeType();
 
 	    if (!this.connection) {
 	        try{
@@ -135,6 +140,31 @@ class Solana {
 	    );
 	    
 	    return signature;
+	}
+
+	async isValidTransaction(signature, wallet_address){
+		let valid = false;
+		let connection = await this.getConnection();
+		try{
+			const check = await connection.getTransaction(signature);
+			if(check !== null && check.transaction.message.accountKeys[0].toString() === wallet_address){
+				valid = true;
+			}
+		}catch(error){
+			//Console.log(error)
+		}
+		return valid;
+	}
+
+	async getTokensByOwner(wallet_address){
+		let connection = await this.getConnection();
+		let response = await connection.getTokenAccountsByOwner(new web3.PublicKey(wallet_address), { programId: TOKEN_PROGRAM_ID, });
+		let tokens = [];
+		response.value.forEach((e) => {
+			const token = e.pubkey.toBase58();
+			tokens.push(token);
+		});
+		return tokens;
 	}
 }
 

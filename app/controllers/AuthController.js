@@ -108,6 +108,8 @@ exports.login = async (req, res) => {
 	//console.log(user)
 
 	if(user !== null){
+		user.checkAndSyncHeroes(); // Check and sync heros
+
 		let hash = user.password;
 		hash = hash.replace(/^\$2y(.+)$/i, '$2a$1');
 

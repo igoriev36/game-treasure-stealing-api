@@ -1,1 +1,0 @@
-(window["webpackJsonp"]=window["webpackJsonp"]||[]).push([["chunk-2d22655c"],{e7e9:function(e,n,t){"use strict";t.r(n);var a=function(){var e=this,n=e.$createElement,t=e._self._c||n;return t("div",{staticClass:"app-container"},[e._v(" Game History ")])},c=[],s=t("2877"),i={},l=Object(s["a"])(i,a,c,!1,null,null,null);n["default"]=l.exports}}]);

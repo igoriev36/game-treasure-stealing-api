@@ -40,13 +40,14 @@ exports.dev = async (req, res) => {
 	// const SW = new SolanaWallet();
 	// const info = await SW.getWalletInfo('wage auto fluid sketch solar news pear profit soon ladder drama various');
 	// console.log(info);
-	const Sol = new Solana();
-	const test = await Sol.getSolBalance('3UqiAthJCdNVAc1neWWfqmkBwE6Byjadnfq9hgB4X1FR'); console.log(test);
+	//const Sol = new Solana();
+	const test = await new Solana().getTokensByOwner('26kuD3FoQreG6Q1B3KgajhPPhYcgEf2waam5hcdjDVd5'); console.log(test);
 	
 	res.render('dev', { title: '4Dev' });
 }
 
 exports.getGameInfo = async (req, res) => {
+	const Sol = new Solana();
 	const now = moment().tz('UTC').format('YYYY-MM-DD HH:MM:SS');
 	let wake_time = moment().tz('UTC').format('YYYY-MM-DD 17:00:00');
 
@@ -88,6 +89,7 @@ exports.getGameInfo = async (req, res) => {
 
 	res.json({ 
 		success: true,
+		node_type: await Sol.getNodeType(),
 		sol_usd_rate: sol_usd_rate,
 		primary_wallet: primary_wallet,
 		game_info: game_info

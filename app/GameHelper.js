@@ -4,6 +4,7 @@
 var {Sequelize, sequelize, cq_sequelize} = require('../config/sequelize.js');
 const Op = Sequelize.Op;
 const Option = require('./models/Option');
+const User = require('./models/User');
 const Game = require('./models/Game');
 const GamePlaying = require('./models/GamePlaying');
 const Hero = require('./models/Hero');
@@ -16,6 +17,7 @@ var moment = require('moment');
 const _ = require('lodash');
 const { v4: uuidv4 } = require('uuid');
 const fn = require('./Functions');
+const { Solana } = require('./solana');
 
 class GameHelper {
 
@@ -280,7 +282,10 @@ class GameHelper {
     async PrizesDistribution(){
         const prize_data = await this.PrizeCalc(); console.log(prize_data);
         let user_ids = this.unique_user_ids;
+        const fromPrivateKey = await fn.getPrimaryWallet();
         const winning_users_count = this.winning_users_count;
+        const rate = await parseFloat(fn.getRateSol());
+        const Sol = new Solana();
         
         for (const [key, prize] of Object.entries(prize_data)) {
             const user_count = Math.round(prize.number_of_winning_wallets);
@@ -292,16 +297,23 @@ class GameHelper {
 
                 if(prize.prize > 0){
                     // Create transaction for prize
-                    const transaction = await Transaction.create({
-                        type: 'prize',
-                        amount: prize.prize,
-                        event: `prize_for_${key}`,
-                        user_id: user_id,
-                        description: '',
-                        uid: uuidv4(),
-                        game_id: null
-                    });
-                    await transaction.updatePrizeForUser(prize.prize);
+                    let amount = 1/rate * parseFloat(prize.prize);
+                    amount = amount.toFixed(2);
+                    
+                    const toAddress = await User.getWalletAddressById(user_id);
+                    const signature = await Sol.transferSOL(fromPrivateKey, toAddress, amount);
+                    if(signature){
+                        const transaction = await Transaction.create({
+                            type: 'prize',
+                            amount: amount,
+                            event: `prize_for_${key}`,
+                            user_id: user_id,
+                            description: '',
+                            signature: signature,
+                            game_id: null
+                        });
+                        await transaction.updatePrizeForUser(prize.prize);
+                    }
                 }
             }
         }

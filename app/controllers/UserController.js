@@ -1,13 +1,14 @@
 /**
  * User Controller
  */
-const { Hero, UserMeta, GamePlaying } = require('../models');
+const { Hero, UserMeta, GamePlaying, Transaction } = require('../models');
 const { Op } = require("sequelize");
 const User = require('../models/User');
 const Game = require('../models/Game');
 var moment = require('moment');
 const GameHelper = require('../GameHelper');
 const stripslashes = require('locutus/php/strings/stripslashes');
+const { Solana } = require('../solana');
 
 /**
  * [description]
@@ -109,8 +110,11 @@ exports.updateNonNftEntries = async (req, res) => {
  * @return {[type]}     [description]
  */
 exports.enterGame = async (req, res) => {
+	const signature = req.body.signature;
+	const timestamp = req.body.timestamp;
 	const user_id = parseInt(req.user.id);
 	const user = await User.findByPk(user_id);
+	const Sol = new Solana(); 
 
 	let game_id = await Game.getCurrentId();
 	// Check game today is created
@@ -119,8 +123,33 @@ exports.enterGame = async (req, res) => {
 		game_id = parseInt(game.id);
 	}
 
+	if(signature === undefined || signature === '' || !await Sol.isValidTransaction(signature, user.wallet_address)){
+		res.json({ 
+			success: false,
+			game_info: {},
+			game_id: 0,
+			game_playing_id: 0,
+			message: 'Invalid transaction signature'
+		});
+		exit;
+	}else{
+		await Transaction.create({
+			type: 'game_payout',
+            amount: 0,
+            event: `game_payout`,
+            user_id: user_id,
+            description: '',
+            signature: signature,
+            game_id: game_id
+		});
+	}
+
 	let currentGame = await user.getCurrentGame();
 	let game_playing_id = 0;
+
+	const game_info = await user.getCalGameInfo();
+	let json_data = game_info;
+
 	if(currentGame === null){
 		currentGame = await GamePlaying.create({
 			user_id: user_id,
@@ -142,9 +171,6 @@ exports.enterGame = async (req, res) => {
 
 	game_playing_id = parseInt(currentGame.id);
 
-	const game_info = await user.getCalGameInfo();
-	let json_data = game_info;
-
 	const helper = new GameHelper();
 	helper.PrepareCalculation();
 	
@@ -153,5 +179,16 @@ exports.enterGame = async (req, res) => {
 		game_info: game_info,
 		game_id: game_id,
 		game_playing_id: game_playing_id
+	});
+}
+
+exports.getBalanceWallet = async (req, res) => {
+	const wallet_address = req.body.wallet_address;
+	const wallet = req.user.wallet;
+	const Sol = new Solana();
+	const balance = await Sol.getSolBalance(wallet);
+	res.json({ 
+		success: true,
+		balance: parseFloat(balance)
 	});
 }
