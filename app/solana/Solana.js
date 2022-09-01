@@ -142,6 +142,18 @@ class Solana {
 	    return signature;
 	}
 
+	async getAmountBySignature(signature){
+		let connection = await this.getConnection();
+		let amount = 0;
+		try{
+			const check = await connection.getTransaction(signature);
+			amount = check.meta.preBalances[0] - check.meta.postBalances[0];
+			amount = amount / web3.LAMPORTS_PER_SOL;
+			amount = amount.toFixed(4);
+		}catch(e){}
+		return amount;
+	}
+
 	async isValidTransaction(signature, wallet_address){
 		let valid = false;
 		let connection = await this.getConnection();

@@ -17,7 +17,8 @@ var GamePlaying = sequelize.define('GamePlaying', {
 	heroes			: Sequelize.TEXT,
 	finished		: Sequelize.INTEGER,
 	non_nft_entries	: Sequelize.INTEGER,
-	winning_hero	: Sequelize.STRING
+	winning_hero	: Sequelize.STRING,
+	submitted		: Sequelize.JSONB
 },{
 	tableName    	: 'game_playing',
 	createdAt    	: 'created_at',

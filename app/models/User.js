@@ -79,6 +79,10 @@ User.prototype.getCurrentGame = async function(){
     return game;
 }
 
+/**
+ * [description]
+ * @return {[type]} [description]
+ */
 User.prototype.getCurrentGameId = async function(){
 	const game = await this.getCurrentGame();
     return game !== null? parseInt(game.id): 0;
@@ -159,10 +163,13 @@ User.prototype.getCalGameInfo = async function() {
 			NoRakePrizePool: 0,
             PostRakePrizePool: 0,
             entry_total: 0,
+            price_per_entry: 0,
+            non_entry_total: 0,
             ticket_total: 0,
             user_total: 0,
             EstUsers: 0,
-            EstRakePerDay: 0
+            EstRakePerDay: 0,
+            tokens: []
 		}
 	}
 	
@@ -172,16 +179,22 @@ User.prototype.getCalGameInfo = async function() {
 	const NoRakeEV = (ChanceOfWinning*game_calc.NoRakePrizePool)+(-ChanceNotWin*TotalSpent);
 	const PostRakeEV = (ChanceOfWinning*game_calc.PostRakePrizePool)+(-ChanceNotWin*TotalSpent);
 
+	// Get current game
+	const currentGame = await this.getCurrentGame();
+
 	entry_cal.TotalSpent = TotalSpent;
 	entry_cal.entry_total = entry_total;
+	entry_cal.price_per_entry = price_per_entry;
+	entry_cal.non_entry_total = non_nft_entries;
 	entry_cal.ticket_total = ticket_total;
 	entry_cal.ChanceOfWinning = ChanceOfWinning;
 	entry_cal.ChanceNotWin = ChanceNotWin;
 	entry_cal.NoRakeEV = NoRakeEV;
 	entry_cal.PostRakeEV = PostRakeEV;
+	entry_cal.tokens = _.isEmpty(currentGame.heroes)? []: JSON.parse(currentGame.heroes);
 	//console.log(entry_cal);
 	//UserMeta._update(user_id, 'current_entries_calc', JSON.stringify(entry_cal));
-	const currentGame = await this.getCurrentGame();
+	
 	if(currentGame !== null){
 		currentGame.update({data: entry_cal});
 		currentGame.save();
@@ -190,20 +203,45 @@ User.prototype.getCalGameInfo = async function() {
 	return entry_cal;
 }
 
+/**
+ * [description]
+ * @return {[type]} [description]
+ */
 User.prototype.getNonNftEntries = async function() {
 	const game = await this.getCurrentGame();
     return game !== null? parseInt(game.non_nft_entries): 0;
 }
 
+/**
+ * [description]
+ * @return {[type]} [description]
+ */
 User.prototype.getCurrentEntriesCalc = async function() {
 	const currentGame = await this.getCurrentGame();
 	let current_entries_calc = currentGame !== null? currentGame.data: {};
 	if(_.isEmpty(current_entries_calc)){
-		current_entries_calc = JSON.parse('{"TotalSpent":0,"entry_total":0,"ticket_total":0,"ChanceOfWinning":0,"ChanceNotWin":0,"NoRakeEV":0,"PostRakeEV":0}');
+		current_entries_calc = JSON.parse('{"TotalSpent":0, "entry_total":0, "non_entry_total":0, "ticket_total":0, "ChanceOfWinning":0, "ChanceNotWin":0, "NoRakeEV":0, "PostRakeEV":0}');
 	}
 	return current_entries_calc;
 }
 
+/**
+ * [description]
+ * @return {[type]} [description]
+ */
+User.prototype.getSubmitted = async function(){
+	const currentGame = await this.getCurrentGame();
+	let submitted = currentGame !== null? currentGame.submitted: [];
+	if(_.isEmpty(submitted)){
+		submitted = [];
+	}
+	return submitted;
+}
+
+/**
+ * [description]
+ * @return {[type]} [description]
+ */
 User.prototype.getHeroes = async function(){
 	let heroes_mint = [];
 	let heroes = await Hero.findAll({ where: { user_id: parseInt(this.id) }});
@@ -227,6 +265,10 @@ User.prototype.getHeroes = async function(){
 	return {heroes_mint: heroes_mint, heroes_data: heroes_arr};
 }
 
+/**
+ * [description]
+ * @return {[type]} [description]
+ */
 User.prototype.updateBalance = async function(amount){
 	let balance = parseFloat(this.balance) || 0;
 	balance += parseFloat(amount);

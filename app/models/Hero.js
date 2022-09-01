@@ -24,10 +24,23 @@ var Hero = sequelize.define('Hero', {
 	underscored  	: true
 });
 
+/**
+ * Get token info by array
+ * @param  array tokens_address [array token]
+ * @return array                [List]
+ */
 Hero.getTokenInfoByArr = async function(tokens_address){
 	if(typeof tokens_address !== 'object')
 		return null;
 	return await Token.findAll({ include:[{model: TokenName, required:true},{model: Character, required:true},{model: MetaData, required:true, as: 'meta'}], where: {token_address: tokens_address} });
+}
+
+/**
+ * Reset status after game end
+ * @return {status} [Update status]
+ */
+Hero.resetStatus = async function(){
+	return await Hero.update({active: 0}, {where: {active: 1}});
 }
 
 module.exports = Hero;
