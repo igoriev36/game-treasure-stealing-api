@@ -22,10 +22,11 @@ exports.dev = async (req, res) => {
 	//
 	//const dr = fn.lastDateRange();
 	//console.log(dr);
+	fn.getSolCluster();
 	
 	const helper = new GameHelper();
-	//let data = await helper.PrizeCalc();
-	let data = await helper.PrizesDistribution();
+	//await helper.calcTokenTimesQueued(45);
+	// let data = await helper.PrizesDistribution();
 	//console.log(data);
 
 	// await Hero.resetStatus();

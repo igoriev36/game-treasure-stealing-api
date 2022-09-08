@@ -1,5 +1,6 @@
 const AdminAuthController = require('../app/controllers/admin/AdminAuthController');
 const AdminGameController = require('../app/controllers/admin/AdminGameController');
+const AdminTranactionController = require('../app/controllers/admin/AdminTranactionController');
 const SettingsController = require('../app/controllers/admin/SettingsController');
 const SolanaController = require('../app/controllers/admin/SolanaController');
 const {authenticateToken} = require('../app/middlewares/admin-auth.middleware');
@@ -33,4 +34,8 @@ exports.config = function(app, _prefix){
 	app.get(`${_prefix}/game-info/:game_id`, [authenticateToken, AdminGameController.loadGameInfo]);
 	app.post(`${_prefix}/game/create-game-for-all-user`, [authenticateToken, AdminGameController.createGameForAllUser]);
 	app.post(`${_prefix}/game/check`, [authenticateToken, AdminGameController.gameCheck]);
+	app.post(`${_prefix}/game/end`, [authenticateToken, AdminGameController.gameEnd]);
+
+	// Transaction
+	app.get(`${_prefix}/transactions/list`, [authenticateToken, AdminTranactionController.loadList]);
 }

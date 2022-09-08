@@ -1,7 +1,7 @@
 //Store
 var {Sequelize, sequelize} = require('../../config/sequelize.js');
-var User = require('../models/User');
-var GamePlaying = require('../models/GamePlaying');
+const User = require('../models/User');
+const GamePlaying = require('../models/GamePlaying');
 
 var Transaction = sequelize.define('Transaction', {
 	id: {
@@ -15,9 +15,11 @@ var Transaction = sequelize.define('Transaction', {
 	event           : Sequelize.STRING,
 	user_id 		: Sequelize.BIGINT,
 	game_playing_id : Sequelize.BIGINT,
+	game_id 		: Sequelize.BIGINT,
 	description   	: Sequelize.TEXT,
   	signature   	: Sequelize.STRING,
-  	token   		: Sequelize.STRING
+  	token   		: Sequelize.STRING,
+  	sol_cluster   	: Sequelize.STRING
 },{
 	tableName    	: 'game_transactions',
 	createdAt    	: 'created_at',
@@ -26,15 +28,24 @@ var Transaction = sequelize.define('Transaction', {
 	underscored  	: true
 });
 
+Transaction.hasOne(User, {
+  	foreignKey: 'id',
+  	targetKey: 'user_id'
+});
+
+Transaction.prototype.user = async function(){
+	return await User.findByPk(parseInt(this.user_id));
+}
+
 Transaction.prototype.updatePrizeForUser = async function(prizeAmount){
 	const user = await User.findByPk(parseInt(this.user_id));
-	const game_id = await user.getCurrentGameId();
+	const game_playing_id = await user.getCurrentGameId();
 
 	// await user.updateBalance(prizeAmount);
 
-	if(game_id){
-		GamePlaying.update({finished: 1}, {where: {id: game_id}});
-		this.update({game_playing_id: game_id});
+	if(game_playing_id){
+		GamePlaying.update({finished: 1}, {where: {id: game_playing_id}});
+		this.update({game_playing_id: game_playing_id});
 		this.save();
 	}
 }

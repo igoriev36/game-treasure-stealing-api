@@ -68,6 +68,15 @@ module.exports.getExtraTicketsByToken = async function(token_address){
 }
 
 /**
+ * [get Solana Cluster]
+ * @return {[type]} [description]
+ */
+module.exports.getSolCluster = async function(){
+    const solana_settings = await Option._get('solana_settings');
+    return solana_settings.node_type || 'devnet';
+}
+
+/**
  * Get rate sol => usd from settings (this value will automatic update every minute)
  * @return float rate [Rate SOL>USD]
  */

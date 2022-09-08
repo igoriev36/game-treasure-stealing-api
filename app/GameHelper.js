@@ -26,6 +26,7 @@ class GameHelper {
         this.unique_user_ids = [];
         this.total_user = 0;
         this.winning_users_count = 0;
+        this.game_id = 0;
     }
 
     randomIntFromInterval(min, max) {
@@ -126,13 +127,22 @@ class GameHelper {
         let self = this;
 
         const {start_date, end_date} = fn.dateRange();
-        const games = await GamePlaying.findAll({where: {
-            created_at: { 
-                [Op.gt]: start_date,
-                [Op.lt]: end_date
-            },
-            finished: 0
-        }});
+        let games = [];
+
+        if(this.game_id){
+            games = await GamePlaying.findAll({where: {
+                game_id: self.game_id,
+                finished: 0
+            }});
+        }else{
+            games = await GamePlaying.findAll({where: {
+                created_at: { 
+                    [Op.gt]: start_date,
+                    [Op.lt]: end_date
+                },
+                finished: 0
+            }});
+        }
 
         let unique_user_ids = _.map(games, 'user_id');
         let game_submitted = _.map(games, 'submitted');
@@ -158,15 +168,21 @@ class GameHelper {
         game_submitted.forEach( submitted => {
             const last_sm = _.last(submitted);
             if(last_sm){
+                submitted_count++;
+                total_avg_price_per_entries += last_sm.price_per_entry;
+            }
+        });
+        AVG_price_per_entry = total_avg_price_per_entries / submitted_count;
+
+        game_submitted.forEach( submitted => {
+            const last_sm = _.last(submitted);
+            if(last_sm){
                 let nne_no = last_sm.non_entry_total;
                 entry_total_nne += nne_no;
                 ticket_total_nne += nne_no * parseInt(hero_tier_nne.tickets);
                 TotalSpent_nne += nne_no*AVG_price_per_entry;
-                total_avg_price_per_entries += last_sm.price_per_entry;
-                submitted_count++;
             }
         });
-        AVG_price_per_entry = total_avg_price_per_entries / submitted_count;
 
         const tokens = await Token.findAll({where: {token_address: tokens_address}});
         let entry_calc = {};
@@ -224,12 +240,43 @@ class GameHelper {
             entry_calc.EstRakePerDay = TotalSpent_nne - PostRakePrizePool;
         }
 
+        // console.log(entry_calc)
         // Update this will use for single user calc [PostRake EV, NoRake EV]
         // Option._update('last_update_entry_calc', JSON.stringify(entry_calc));
-        Game.getQueuedThieves();
-        await Game.updateData({data: entry_calc});
+        Game.getQueuedThieves(this.game_id);
+        await Game.updateData({data: entry_calc}, this.game_id);
 
         return entry_calc;
+    }
+
+    /**
+     * [calcTokenTimesQueued description]
+     * @param  {[type]} game_id [description]
+     * @return {[type]}         [description]
+     */
+    async calcTokenTimesQueued(game_id){
+        game_id = game_id || 0;
+        let default_extra_data = {
+            times_queued: 0,
+            times_won: 0,
+            sol_earned: 0
+        }
+
+        if(!game_id)
+            return;
+
+        let games_playing = await GamePlaying.findAll({where: {game_id: game_id}});
+        await Promise.all(games_playing.map( gplaying => {
+            let last_submited = _.last(gplaying.submitted);
+            let tokens_submited = last_submited.tokens;
+            tokens_submited.forEach( async token => {
+                const hero = await Hero.findOne({where: {mint: token}});
+                let extra_data = hero.extra_data || {};
+                extra_data = Object.assign({}, default_extra_data, extra_data);
+                extra_data.times_queued++;
+                await Hero.update({extra_data: extra_data}, {where: {mint: token} });
+            });
+        }));
     }
 
     /**
@@ -259,21 +306,24 @@ class GameHelper {
         let rakePrizeNextDay = 0;
         let bonenosher_status = await this.getBonenosherStatus();
 
+        // Get rake price last day
+        const backPot = await Game.getBackPot(this.game_id) || 0; // Get from yesterday game
+        
         if(bonenosher_status === 'sleep'){
             paidOut = entry_calc.NoRakePrizePool*80/100;
             rakePrizeNextDay = entry_calc.NoRakePrizePool*20/100;
+            paidOut = paidOut + parseFloat(backPot);
         }else{
             paidOut = 0;
             raked = entry_calc.NoRakePrizePool*33/100; // Game fee CQ
             rakePrizeNextDay = entry_calc.NoRakePrizePool*66/100;
+            rakePrizeNextDay = rakePrizeNextDay + parseFloat(backPot);
         }
 
-        // Get rake price last day
-        const backPot = await Game.getBackPot() || 0; // Get from yesterday game
-        paidOut = paidOut + parseFloat(backPot);
-
+        // Update token Times queued
+        await this.calcTokenTimesQueued(this.game_id);
         // Store in database
-        await Game.updateData({result: bonenosher_status, back_pot: rakePrizeNextDay, raked: raked});
+        await Game.updateData({result: bonenosher_status, back_pot: rakePrizeNextDay, raked: raked}, this.game_id);
 
         for(var i=0; i<max_prize; i++){
             let no_of_winning_wallets = i === 0? percent_of_winning_users[i]/100*winning_users: Math.round(percent_of_winning_users[i]/100*winning_users);
@@ -298,7 +348,13 @@ class GameHelper {
      * [PrizesDistribution description]
      * The function should just pull random tickets until all [winners] prizes are distributed
      */
-    async PrizesDistribution(){
+    async PrizesDistribution(game_id){
+        if(typeof game_id !== 'undefined'){
+            this.game_id = parseInt(game_id);
+        }else{
+            game_id = this.game_id !== 0? this.game_id: 0;
+        }
+
         const prize_data = await this.PrizeCalc();
         let user_ids = this.unique_user_ids;
         const fromPrivateKey = await fn.getPrimaryPrivateKey();
@@ -325,11 +381,13 @@ class GameHelper {
                         const signature = await Sol.transferSOL(fromPrivateKey, toAddress, amount);
                         if(signature){
                             const user = await User.findByPk(parseInt(user_id));
-                            const game = await user.getCurrentGame();
-                            let game_id = game !== null? parseInt(game.id): 0;
+
+                            const game = await user.getCurrentGame(game_id);
+                            const playing_game_id = game !== null? parseInt(game.id): 0;
+                            
                             let ran_token = '';
 
-                            if(game_id){
+                            if(playing_game_id){
                                 let last_submited = _.last(game.submitted);
                                 let tokens_submited = last_submited.tokens;
                                 // Random token (hero) win game
@@ -349,32 +407,31 @@ class GameHelper {
                                     let sol_earned = 0;
 
                                     if(hero !== null){
-                                        let extra_data = hero.extra_data;
+                                        let extra_data = hero.extra_data || {};
                                         if(typeof extra_data === 'object' && extra_data !== null){
+                                            //console.log(token, ran_token);
                                             if(token === ran_token){
-                                                times_queued += extra_data.times_queued;
                                                 times_won += extra_data.times_won;
                                                 sol_earned = extra_data.sol_earned + amount;
                                             }else{
-                                                times_queued += extra_data.times_queued;
                                                 times_won = extra_data.times_won;
                                                 sol_earned = extra_data.sol_earned;
                                             }
                                         }
 
-                                        extra_data = {
-                                            times_queued: times_queued,
+                                        // Update hero (token) stats
+                                        extra_data = Object.assign({}, extra_data, {
                                             times_won: times_won,
                                             sol_earned: sol_earned
-                                        }
-
+                                        });
                                         Hero.update({extra_data: extra_data}, {where: {mint: token} });
                                     }
                                 }));
 
-                                GamePlaying.update({finished: 1, winning_hero: ran_token}, {where: {id: game_id}});
+                                GamePlaying.update({finished: 1, winning_hero: ran_token}, {where: {id: playing_game_id}});
                             }
 
+                            const sol_cluster = await fn.getSolCluster();
                             const transaction = await Transaction.create({
                                 type: 'prize',
                                 amount: amount,
@@ -382,8 +439,10 @@ class GameHelper {
                                 user_id: user_id,
                                 description: `Reward SOL ${amount} for user_id = ${user_id} `,
                                 signature: signature,
-                                game_playing_id: game_id,
-                                token: ran_token
+                                game_playing_id: playing_game_id,
+                                game_id: game_id,
+                                token: ran_token,
+                                sol_cluster: sol_cluster
                             });
                         }
                     }catch(error){
@@ -393,10 +452,14 @@ class GameHelper {
             }
         }
 
-        await Game.setEndGame();
+        await Game.setEndGame(game_id);
         await Hero.resetStatus();
 
         return true;
+    }
+
+    async endGame(game_id){
+        await this.PrizesDistribution(parseInt(game_id));
     }
 }
 

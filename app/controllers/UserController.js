@@ -10,6 +10,7 @@ const GameHelper = require('../GameHelper');
 const stripslashes = require('locutus/php/strings/stripslashes');
 const { Solana } = require('../solana');
 const _ = require('lodash');
+const fn = require('../Functions');
 
 /**
  * [description]
@@ -176,6 +177,7 @@ exports.enterGame = async (req, res) => {
 	game_playing_id = parseInt(currentGame.id);
 	const amount = await Sol.getAmountBySignature(signature);
 	let description = `Paid for ${game_info.entry_total}`;
+	const sol_cluster = await fn.getSolCluster();
 
 	await Transaction.create({
 		type: 'game_payout',
@@ -185,7 +187,8 @@ exports.enterGame = async (req, res) => {
         description: description,
         signature: signature,
         game_id: game_id,
-        game_playing_id: game_playing_id
+        game_playing_id: game_playing_id,
+        sol_cluster: sol_cluster
 	});
 
 	const helper = new GameHelper();

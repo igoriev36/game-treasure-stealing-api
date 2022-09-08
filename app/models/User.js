@@ -1,7 +1,15 @@
 //Store
 var {Sequelize, sequelize} = require('../../config/sequelize.js');
 const { Op } = require("sequelize");
-const { Game, GamePlaying, Hero, QuantityLookup, HeroTierTicket, UserMeta, Option } = require('./');
+//const { Game, GamePlaying, Hero, QuantityLookup, HeroTierTicket, UserMeta, Option } = require('./');
+const Game = require('./Game');
+const GamePlaying = require('./GamePlaying');
+const Hero = require('./Hero');
+const QuantityLookup = require('./QuantityLookup');
+const HeroTierTicket = require('./HeroTierTicket');
+const UserMeta = require('./UserMeta');
+const Option = require('./Option');
+
 const { Token } = require('../cq-models');
 const fn = require('../Functions');
 const _ = require('lodash');
@@ -61,22 +69,27 @@ User.getWalletAddressById = async function(user_id){
 }
 
 // Get current game
-User.prototype.getCurrentGame = async function(){
+User.prototype.getCurrentGame = async function(game_id){
 	const {start_date, end_date} = fn.dateRange();
-	let game = await GamePlaying.findOne({where: {
-		user_id: parseInt(this.id),
-      	created_at: { 
-        	[Op.gt]: start_date,
-        	[Op.lt]: end_date
-      	},
-      	finished: 0
-    }, order: [['id', 'DESC']]});
+	let where = {};
+	if(typeof game_id !== 'undefined'){
+		game_id = parseInt(game_id);
+		where = {
+			game_id: game_id
+		}
+	}else{
+		game_id = 0;
+		where = {
+			user_id: parseInt(this.id),
+	      	created_at: { 
+	        	[Op.gt]: start_date,
+	        	[Op.lt]: end_date
+	      	},
+	      	finished: 0
+	    }
+	}
 
-    // if(game === null){
-    // 	game = await GamePlaying.create({user_id: parseInt(this.id), data: {}, heroes: '[]', finished: 0, non_nft_entries: 0});
-    // }
-
-    return game;
+    return await GamePlaying.findOne({where: where, order: [['id', 'DESC']]});
 }
 
 /**
@@ -252,13 +265,15 @@ User.prototype.getHeroes = async function(){
 			heroes_arr.push({
 				id: parseInt(hero.id),
 				mint: hero.mint,
-				active: hero.active
+				active: hero.active,
+				extra_data: hero.extra_data
 			});
 		})
 	}
 
 	const heroes_info = await Hero.getTokenInfoByArr(heroes_mint);
 	heroes_arr.forEach( hero => {
+		hero.stats = hero.extra_data;
 		hero.info = _.chain(heroes_info).filter(function (hi) { return hi.token_address === hero.mint }).first().value();
 	})
 
